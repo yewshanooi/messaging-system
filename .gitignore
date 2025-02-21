@@ -1,0 +1,11 @@
+# Dev documentation
+docs/
+
+# Dependency directories
+node_modules/
+
+# Environment variables
+.env
+
+# Package manifest
+package-lock.json
