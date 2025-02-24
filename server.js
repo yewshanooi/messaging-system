@@ -11,6 +11,9 @@ const jwt = require('jsonwebtoken');
 const { MailtrapClient } = require('mailtrap');
 require('dotenv').config();
 
+// Get path for HTML pages
+const path = require("path");
+
 
 
 // Express.js
@@ -41,7 +44,7 @@ const sender = { name: "MessagingSystem", email: process.env.DEFAULT_EMAIL };
 
 
 client.get('/', (req, res) => {
-    res.send('Welcome to MessagingSystem. If you can read this message, that means our server is active and running with Status Code 200!');
+    res.sendFile(path.join(__dirname, "./public/index.html"));
 });
 
 client.post('/register', async (req, res) => {
@@ -67,7 +70,7 @@ client.post('/register', async (req, res) => {
                 const id = result.rows[0].user_id;
                 const token = jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '15m' });
 
-                const link = `http://localhost:${port}/verify?token=${token}`;
+                const link = `http://localhost:${port}/verify?register_token=${token}`;
 
                 mail.send({
                     from: sender,
@@ -85,12 +88,11 @@ client.post('/register', async (req, res) => {
     }
 });
 
-client.post('/verify', async (req, res) => {
-    // [TODO] Add a response message UI in HTML when user clicks link
-    const { token } = req.query;
+client.get('/verify', async (req, res) => {
+    const { register_token } = req.query;
 
     try {
-        const { id } = jwt.verify(token, process.env.JWT_SECRET);
+        const { id } = jwt.verify(register_token, process.env.JWT_SECRET);
 
         const fetch = await database.query('SELECT * FROM "user" WHERE user_id = $1', [id]);
         const user = fetch.rows[0];
@@ -100,7 +102,11 @@ client.post('/verify', async (req, res) => {
 
         await database.query('UPDATE "user" SET user_verified = $1 WHERE user_id = $2', [true, id]);
 
-        res.status(200).json({ message: 'Successfully verified email' });
+        // [TODO] Add expiry date for token
+        const user_token = jwt.sign({ id: user.user_id, role: user.user_role, verified: user.user_verified }, process.env.JWT_SECRET);
+
+        // res.status(200).sendFile(path.join(__dirname, "./public/verified.html"));
+        res.status(200).json({ message: 'Successfully verified email', user_token });
     } catch (error) {
         console.error(error);
         res.status(400).json({ error: 'Invalid or expired token' });
@@ -121,9 +127,7 @@ client.post('/login', async (req, res) => {
         const user = fetch.rows[0];
         if (!user.user_verified) return res.status(403).json({ error: "Email not verified" });
 
-        const token = jwt.sign({ id: user.user_id, role: user.user_role, verified: user.user_verified }, process.env.JWT_SECRET);
-
-        return res.status(200).header('Authorization', `Bearer ${token}`).json({ message: "Successfully logged in" });
+        return res.status(200).json({ message: "Successfully logged in" });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });
