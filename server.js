@@ -4,15 +4,13 @@ const express = require('express');
 // Encrypt password
 const bcrypt = require('bcryptjs');
 
-// Generate unique token
+// Generate unique tokens
 const jwt = require('jsonwebtoken');
-
-// Send email
-const { MailtrapClient } = require('mailtrap');
-require('dotenv').config();
 
 // Get path for HTML pages
 const path = require("path");
+
+require('dotenv').config();
 
 
 
@@ -37,10 +35,6 @@ database.connect().then(() => console.log(`Connected to database '${database.use
 
 // [TODO] Create database query manually without pgAdmin
 
-// Mailtrap
-const mail = new MailtrapClient({ token: process.env.MAILTRAP_API_KEY });
-const sender = { name: "MessagingSystem", email: process.env.DEFAULT_EMAIL };
-
 
 
 client.get('/', (req, res) => {
@@ -59,7 +53,7 @@ client.post('/register', async (req, res) => {
 
         const query = 'INSERT INTO "user" (user_name, user_email, user_password, user_role, user_verified) VALUES ($1, $2, $3, $4, $5) RETURNING user_id';
 
-        database.query(query, [username, email, hashedPassword, "Normal User", verifyStatus], (err, result) => {
+        database.query(query, [username, email, hashedPassword, 'member', verifyStatus], (err, result) => {
             if (err) {
                 console.error(err);
                 res.status(500).json({ error: 'Error registering user' });
@@ -72,14 +66,7 @@ client.post('/register', async (req, res) => {
 
                 const link = `http://localhost:${port}/verify?register_token=${token}`;
 
-                mail.send({
-                    from: sender,
-                    to: [{ email: email }],
-                    subject: "Verify Your Email",
-                    html: `Welcome <b>${username}</b> to MessagingSystem! <br><br><br> Please click <a href="${link}">here</a> to verify your account <br><br><br> This is an auto-generated email. Please do not reply to this message. <br> If you have any questions, please contact our support team at support@demomailtrap.com.`
-                })
-                .then(console.log)
-                .catch(console.error);
+                console.log(`Welcome <b>${username}</b> to MessagingSystem! <br><br><br> Please click <a href="${link}">here</a> to verify your account.`);
             }
         });
     } catch (error) {
@@ -102,8 +89,13 @@ client.get('/verify', async (req, res) => {
 
         await database.query('UPDATE "user" SET user_verified = $1 WHERE user_id = $2', [true, id]);
 
-        // [TODO] Add expiry date for token
-        const user_token = jwt.sign({ id: user.user_id, role: user.user_role, verified: user.user_verified }, process.env.JWT_SECRET);
+        const userdata = {
+            id: user.user_id,
+            role: user.user_role,
+            verified: user.user_verified
+        };
+
+        const user_token = jwt.sign({ userdata }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
         // res.status(200).sendFile(path.join(__dirname, "./public/verified.html"));
         res.status(200).json({ message: 'Successfully verified email', user_token });
