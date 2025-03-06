@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat</title>
+    <style>
+        .chat-box {
+            border-style: solid;
+            margin-top: 20px;
+            padding: 10px;
+        }
+
+        .chat-content {
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+
+        .chat-form {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .chat-input {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <button>Logout</button>
+    <div class="chat-box">
+        <h2>Chat</h2>
+        <div class="chat-content">
+            <p><b>{username}</b>: this is a message</p>
+            <p><b>{username}</b>: this is another message</p>
+        </div>
+        <form class="chat-form" action="/chat" method="POST">
+            <input class="chat-input" type="text" id="message" name="message">
+            <input type="submit" value="Send">
+        </form>
+    </div>
+</body>
+</html>

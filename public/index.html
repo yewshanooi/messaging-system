@@ -9,10 +9,33 @@
     <h2>Welcome to Messaging System</h2>
     <p>Available Endpoints:</p>
     <ul>
-        <li>/</li>
-        <li>/register</li>
-        <li>/verify</li>
-        <li>/login</li>
+        <li>/ 
+            <p>
+                <b>[GET]</b> Index page for Messaging System.
+            </p>
+        </li>
+        <li>/register 
+            <p>
+                <b>[GET]</b> Form to register a new account. <br>
+                <b>[POST]</b> Register function with password hashing and validation.
+            </p>
+        </li>
+        <li>/verify
+            <p>
+                <b>[GET]</b> Request using a valid token to verify account.
+            </p>
+        </li>
+        <li>/login 
+            <p>
+                <b>[GET]</b> Form to login using credentials. <br>
+                <b>[POST]</b> Login function with validation.
+            </p>
+        </li>
+        <li>/chat 
+            <p>
+                <b>[GET]</b> Messaging page for authenticated users.
+            </p>
+        </li>
     </ul>
 </body>
 </html>

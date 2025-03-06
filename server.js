@@ -18,7 +18,10 @@ require('dotenv').config();
 const client = express();
 const port = process.env.EXPRESS_PORT;
 
+// Middleware to parse JSON request body
 client.use(express.json());
+// Middleware to parse URL-encoded request body (such as HTML forms)
+client.use(express.urlencoded({ extended: false }));
 
 // PostgreSQL
 const { Client } = require('pg');
@@ -38,15 +41,19 @@ database.connect().then(() => console.log(`Connected to database '${database.use
 
 
 client.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, "./public/index.html"));
+    res.sendFile(path.join(__dirname, './public/index.html'));
+});
+
+client.get('/register', (req, res) => {
+    res.sendFile(path.join(__dirname, './public/register.html'));
 });
 
 client.post('/register', async (req, res) => {
     try {
         const { username, email, password } = req.body;
 
-        // const userExist = await database.query('SELECT * FROM "user" WHERE user_name = $1 OR user_email = $2', [username, email]);
-        // if (userExist.rows.length > 0) return res.status(400).json({ error: 'User already exists' });
+        const userExist = await database.query('SELECT * FROM "user" WHERE user_name = $1 OR user_email = $2', [username, email]);
+        if (userExist.rows.length > 0) return res.status(400).json({ error: 'User already exists' });
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const verifyStatus = false;
@@ -66,7 +73,7 @@ client.post('/register', async (req, res) => {
 
                 const link = `http://localhost:${port}/verify?register_token=${token}`;
 
-                console.log(`Welcome <b>${username}</b> to MessagingSystem! <br><br><br> Please click <a href="${link}">here</a> to verify your account.`);
+                console.log(`Welcome ${username} to MessagingSystem! Please verify your account: ${link}`);
             }
         });
     } catch (error) {
@@ -89,20 +96,15 @@ client.get('/verify', async (req, res) => {
 
         await database.query('UPDATE "user" SET user_verified = $1 WHERE user_id = $2', [true, id]);
 
-        const userdata = {
-            id: user.user_id,
-            role: user.user_role,
-            verified: user.user_verified
-        };
-
-        const user_token = jwt.sign({ userdata }, process.env.JWT_SECRET, { expiresIn: '1h' });
-
-        // res.status(200).sendFile(path.join(__dirname, "./public/verified.html"));
-        res.status(200).json({ message: 'Successfully verified email', user_token });
+        return res.status(200).sendFile(path.join(__dirname, "./public/verified.html"));
     } catch (error) {
         console.error(error);
         res.status(400).json({ error: 'Invalid or expired token' });
     }
+});
+
+client.get('/login', (req, res) => {
+    res.sendFile(path.join(__dirname, './public/login.html'));
 });
 
 client.post('/login', async (req, res) => {
@@ -111,15 +113,41 @@ client.post('/login', async (req, res) => {
 
         const fetch = await database.query('SELECT * FROM "user" WHERE user_name = $1', [username]);
  
-        if (fetch.rows.length === 0) return res.status(401).json({ error: "Username is incorrect" });
+        if (fetch.rows.length === 0) return res.status(401).json({ error: 'Username is incorrect' });
 
         const validPassword = await bcrypt.compare(password, fetch.rows[0].user_password);
-        if (!validPassword) return res.status(401).json({ error: "Invalid password" });
+        if (!validPassword) return res.status(401).json({ error: 'Invalid password' });
 
         const user = fetch.rows[0];
-        if (!user.user_verified) return res.status(403).json({ error: "Email not verified" });
+        if (!user.user_verified) return res.status(403).json({ error: 'Email not verified' });
 
-        return res.status(200).json({ message: "Successfully logged in" });
+        const userdata = {
+            id: user.user_id,
+            role: user.user_role
+        };
+
+        const user_token = jwt.sign({ userdata }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+        return res.status(200).json({ message: 'Successfully logged in', user_token });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+client.get('/chat', (req, res) => {
+    res.sendFile(path.join(__dirname, './public/chat.html'));
+});
+
+client.post('/chat', (req, res) => {
+    try {
+        const { message } = req.body;
+
+        if (!message) return res.status(400).json({ message: 'You cannot send an empty message' })
+
+
+
+        return res.status(200).json({ message: `Successfully send: ${message}` });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Internal server error' });
