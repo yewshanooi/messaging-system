@@ -26,17 +26,75 @@ client.use(express.urlencoded({ extended: false }));
 // PostgreSQL
 const { Client } = require('pg');
 
-const database = new Client({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    port: process.env.DB_PORT,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_DATABASE
-});
 
-database.connect().then(() => console.log(`Connected to database '${database.user}' on port '${database.port}'`));
 
-// [TODO] Create database query manually without pgAdmin
+
+
+let database;
+
+async function dbConfig() {
+    const main_database = new Client({
+        host: process.env.DB_HOST,
+        port: process.env.DB_PORT,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD
+    });
+    
+    await main_database.connect();
+
+
+    // Check whether 'messagingsystem' database exist
+    const dbExist = await main_database.query(`SELECT datname FROM pg_catalog.pg_database WHERE datname = '${process.env.DB_NAME}'`);
+
+    if (dbExist.rowCount === 0) {
+        console.log('[Database] No database found. Creating a new database');
+        await main_database.query(`CREATE DATABASE "${process.env.DB_NAME}";`);
+        console.log(`Created database '${process.env.DB_NAME}' ✅`);
+    } else {
+        console.log(`[Database] '${process.env.DB_NAME}' database exist`);
+    }
+
+    await main_database.end();
+
+
+
+    database = new Client({
+        host: process.env.DB_HOST,
+        port: process.env.DB_PORT,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_NAME
+    });
+    
+    await database.connect().then(() => console.log(`[Database] Connected to database '${database.database}'`));
+
+
+    // Check whether 'user' table exist
+    const tbExist = await database.query(`SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'user');`);
+
+    if (tbExist.rows[0].exists === false) {
+        console.log("[Database] No table found. Creating a new table");
+        await database.query(`
+            CREATE TABLE "user" (
+                user_id SERIAL PRIMARY KEY NOT NULL,
+                user_name VARCHAR(255),
+                user_email VARCHAR(255),
+                user_password VARCHAR(255),
+                user_role VARCHAR(255),
+                user_verified BOOLEAN
+            );`
+        );
+        console.log("Created table 'user' ✅")
+    } else {
+        console.log("[Database] 'user' table exist");
+    }
+
+    // await database.end();
+}
+
+dbConfig();
+
+
 
 
 
