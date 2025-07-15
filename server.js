@@ -10,7 +10,7 @@ const jwt = require('jsonwebtoken');
 // Get path for HTML pages
 const path = require("path");
 
-require('dotenv').config();
+require('@dotenvx/dotenvx').config()
 
 
 
