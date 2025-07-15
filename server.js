@@ -69,13 +69,13 @@ async function dbConfig() {
     await database.connect().then(() => console.log(`[Database] Connected to database '${database.database}'`));
 
 
-    // Check whether 'user' table exist
-    const tbExist = await database.query(`SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'user');`);
+    // Check whether 'users' table exist
+    const userTbExist = await database.query(`SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users');`);
 
-    if (tbExist.rows[0].exists === false) {
-        console.log("[Database] No table found. Creating a new table");
+    if (userTbExist.rows[0].exists === false) {
+        console.log("[Database] No 'users' table found. Creating a new table");
         await database.query(`
-            CREATE TABLE "user" (
+            CREATE TABLE "users" (
                 user_id SERIAL PRIMARY KEY NOT NULL,
                 user_name VARCHAR(255),
                 user_email VARCHAR(255),
@@ -84,9 +84,30 @@ async function dbConfig() {
                 user_verified BOOLEAN
             );`
         );
-        console.log("Created table 'user' ✅")
+        console.log("Created table 'users' ✅")
     } else {
-        console.log("[Database] 'user' table exist");
+        console.log("[Database] 'users' table exist");
+    }
+
+
+    // Check whether 'messages' table exist
+    const messageTbExist = await database.query(`SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'messages');`);
+    
+    if (messageTbExist.rows[0].exists === false) {
+        console.log("[Database] No 'messages' table found. Creating a new table");
+        await database.query(`
+            CREATE TABLE "messages" (
+                message_id SERIAL PRIMARY KEY NOT NULL,
+                message_user INT,
+                message_content TEXT,
+                message_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+                CONSTRAINT fk_message_user FOREIGN KEY (message_user) REFERENCES "users"(user_id)
+            );`
+        );
+        console.log("Created table 'messages' ✅");
+    } else {
+        console.log("[Database] 'messages' table exist");
     }
 
     // await database.end();
@@ -110,13 +131,13 @@ client.post('/register', async (req, res) => {
     try {
         const { username, email, password } = req.body;
 
-        const userExist = await database.query('SELECT * FROM "user" WHERE user_name = $1 OR user_email = $2', [username, email]);
+        const userExist = await database.query('SELECT * FROM "users" WHERE user_name = $1 OR user_email = $2', [username, email]);
         if (userExist.rows.length > 0) return res.status(400).json({ error: 'User already exists' });
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const verifyStatus = false;
 
-        const query = 'INSERT INTO "user" (user_name, user_email, user_password, user_role, user_verified) VALUES ($1, $2, $3, $4, $5) RETURNING user_id';
+        const query = 'INSERT INTO "users" (user_name, user_email, user_password, user_role, user_verified) VALUES ($1, $2, $3, $4, $5) RETURNING user_id';
 
         database.query(query, [username, email, hashedPassword, 'member', verifyStatus], (err, result) => {
             if (err) {
@@ -146,13 +167,13 @@ client.get('/verify', async (req, res) => {
     try {
         const { id } = jwt.verify(register_token, process.env.JWT_SECRET);
 
-        const fetch = await database.query('SELECT * FROM "user" WHERE user_id = $1', [id]);
+        const fetch = await database.query('SELECT * FROM "users" WHERE user_id = $1', [id]);
         const user = fetch.rows[0];
 
         if (!user) return res.status(404).json({ message: 'User not found' });
         if (user.user_verified) return res.status(400).json({ message: 'User already verified' });
 
-        await database.query('UPDATE "user" SET user_verified = $1 WHERE user_id = $2', [true, id]);
+        await database.query('UPDATE "users" SET user_verified = $1 WHERE user_id = $2', [true, id]);
 
         return res.status(200).sendFile(path.join(__dirname, "./public/verified.html"));
     } catch (error) {
@@ -169,7 +190,7 @@ client.post('/login', async (req, res) => {
     try {
         const { username, password } = req.body;
 
-        const fetch = await database.query('SELECT * FROM "user" WHERE user_name = $1', [username]);
+        const fetch = await database.query('SELECT * FROM "users" WHERE user_name = $1', [username]);
  
         if (fetch.rows.length === 0) return res.status(401).json({ error: 'Username is incorrect' });
 
@@ -193,25 +214,6 @@ client.post('/login', async (req, res) => {
     }
 });
 
-client.get('/chat', (req, res) => {
-    res.sendFile(path.join(__dirname, './public/chat.html'));
+client.listen(port, () => {
+    console.log(`Server is running at http://localhost:${port}`);
 });
-
-client.post('/chat', (req, res) => {
-    try {
-        const { message } = req.body;
-
-        if (!message) return res.status(400).json({ message: 'You cannot send an empty message' })
-
-
-
-        return res.status(200).json({ message: `Successfully send: ${message}` });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-
-
-client.listen(port, () => console.log(`Server started on port '${port}'`));
